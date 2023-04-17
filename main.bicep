@@ -9,23 +9,20 @@ param appName string = uniqueString(resourceGroup().id)
 
 param appServicePlanId string
 
-param logAnalyticsWorkspaceId string
+param appInsightsConnectionString string
 
 param tags object = {}
 
-
 // Variables
 var webSiteName = toLower('wapp-${appName}')
-var appInsightName = toLower('appi-${appName}')
 var assignedTags = union(tags, standardTags)
 var standardTags = {
   Application: appName
   Environment: environment
 }
 
-
 // Resources
-resource appService 'Microsoft.Web/sites@2022-09-01' = {
+resource mainWebApp 'Microsoft.Web/sites@2022-09-01' = {
   name: webSiteName
   location: location
   identity: {
@@ -42,40 +39,28 @@ resource appService 'Microsoft.Web/sites@2022-09-01' = {
 
   resource appServiceSiteExtension 'siteExtensions' = {
     name: 'Microsoft.ApplicationInsights.AzureWebSites'
-    dependsOn: [
-      appInsights
-    ]
   }
   
+  // application settings for configuring a dotNet app with App Insights.
+  // Future enhancement to provide settings for different app types based on conditional input.
   resource appServiceLogging 'config' = {
     name: 'appsettings'
     properties: {
-      APPLICATIONINSIGHTS_CONNECTION_STRING: appInsights.properties.ConnectionString
+      APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsConnectionString
+      APPINSIGHTS_PROFILERFEATURE_VERSION: '1.0.0'
+      APPINSIGHTS_SNAPSHOTFEATURE_VERSION: '1.0.0'
+      ApplicationInsightsAgent_EXTENSION_VERSION: '~2'
+      DiagnosticServices_EXTENSION_VERSION: '~3'
+      InstrumentationEngine_EXTENSION_VERSION: '~1'
+      SnapshotDebugger_EXTENSION_VERSION: '~1'
+      XDT_MicrosoftApplicationInsights_BaseExten: '~1'
+      XDT_MicrosoftApplicationInsights_Java: '1'
+      XDT_MicrosoftApplicationInsights_Mode: 'recommended'
+      XDT_MicrosoftApplicationInsights_NodeJS: '1'
+      XDT_MicrosoftApplicationInsights_Preempt_Sdk: 'disabled'
     }
     dependsOn: [
       appServiceSiteExtension
     ]
   }
 }
-
-
-resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
-  name: appInsightName
-  location: location
-  kind: 'string'
-  tags: assignedTags
-  properties: {
-    Application_Type: 'web'
-    WorkspaceResourceId: logAnalyticsWorkspaceId
-  }
-}
-
-
-// resource appServiceSiteExtension 'Microsoft.Web/sites/siteextensions@2020-06-01' = {
-//   parent: appService
-//   name: 'Microsoft.ApplicationInsights.AzureWebSites'
-//   dependsOn: [
-//     appInsights
-//   ]
-// }
-
